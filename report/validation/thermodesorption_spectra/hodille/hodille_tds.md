@@ -19,19 +19,12 @@ kernelspec:
 
 This validation case is a thermo-desorption spectrum measurement perfomed by Hodille et al. TODO: INSERT CITATION
 
-Deuterium ions at 200 eV were implanted in a 0.5 mm thick sample of high purity tungsten foil (PCW).
+Deuterium ions at ??? eV were implanted in a 0.8 mm thick sample of high purity tungsten foil (PW).
 
-The ion beam with an incident flux of $2.5 \times 10^{19} \ \mathrm{D \ m^{-2} \ s^{-1}}$ was turned on for 400 s which corresponds to a fluence of $1.0 \times 10^{22} \ \mathrm{D \ m^{-2}}$
+The ion beam with an incident flux of $5.4 \times 10^{18} \ \mathrm{D \ m^{-2} \ s^{-1}}$ was turned on for ??? s.
 
-The diffusivity of tungsten in the FESTIM model is as measured by Frauenfelder {cite}`frauenfelder_permeation_1968`.
-
-To reproduce this experiment, three traps are needed: 2 intrinsic traps and 1 extrinsic trap.
+To reproduce this experiment, three traps are needed: 2 intrinsic traps and 2 extrinsic traps.
 The extrinsic trap represents the defects created during the ion implantation.
-
-The time evolution of extrinsic traps density $n_i$ expressed in $\text{m}^{-3}$ is defined as:
-\begin{equation}
-    \frac{dn_i}{dt} = \varphi_0\:\left[\left(1-\frac{n_i}{n_{a_{max}}}\right)\:\eta_a \:f_a(x)+\left(1-\frac{n_i}{n_{b_{max}}}\right)\:\eta_b \:f_b(x)\right]
-\end{equation}
 
 +++
 
@@ -45,13 +38,13 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 
-
-
 model = F.Simulation()
 
 vertices = np.concatenate(
     [
-        np.linspace(0, 1e-9, num=500),
+        np.linspace(0, 3e-9, num=200),
+        np.linspace(3e-9, 1e-8, num=300),
+        np.linspace(1e-8, 1e-7, num=100),
     ]
 )
 
@@ -66,142 +59,142 @@ tungsten = F.Material(
 model.materials = tungsten
 import sympy as sp
 
-# ### Temperature Settings ### #
-
 storage_temp = 300 # K
-exposure1_temp = 600 # K <--------------- experiment variable
 exposure2_temp = 600 # K
 temperature_ramp = 15 / 60 # K/s
 hold_temp = 1323 # K
+stop_exposure1 = 4 * 3600 # s
 
-exposure1_time = 4 * 3600 # s
-stop_exposure1 = exposure1_time
-stop_storage1 = stop_exposure1 + (exposure1_temp - storage_temp) / temperature_ramp # s
+def setup(exposure1_temp, density_1, density_2):
+    """
+    Change parameters based on the exposure temperature 
+    and trap densities for each experiment.
+    """
 
-exposure2_time = 19 * 3600  # s
-stop_exposure2 = stop_storage1 + exposure2_time
-stop_storage2 = stop_exposure2 + (exposure2_temp - storage_temp) / temperature_ramp
+    # ### Temperature Settings ### #
+    stop_storage1 = stop_exposure1 + (exposure1_temp - storage_temp) / temperature_ramp # s
 
-stop_tds = stop_storage2 + (hold_temp - storage_temp) / temperature_ramp
+    stop_exposure2 = stop_storage1 + 19 * 3600
+    stop_storage2 = stop_exposure2 + (exposure2_temp - storage_temp) / temperature_ramp
 
-temp_function = sp.Piecewise(
-    (exposure1_temp, F.t < stop_exposure1),
-    (exposure1_temp - temperature_ramp * (F.t - stop_exposure1), F.t < stop_storage1),
-    (exposure2_temp, F.t < stop_exposure2),
-    (exposure2_temp - temperature_ramp * (F.t - stop_exposure2), F.t < stop_storage2),
-    (storage_temp + temperature_ramp * (F.t - stop_storage2), F.t < stop_tds),
-    (hold_temp, True),
-)
-model.T = F.Temperature(value=temp_function)
+    stop_tds = stop_storage2 + (hold_temp - storage_temp) / temperature_ramp
 
-# ### Source Settings ### #
+    model.T = F.Temperature(value=sp.Piecewise(
+        (exposure1_temp, F.t < stop_exposure1),
+        (exposure1_temp - temperature_ramp * (F.t - stop_exposure1), F.t < stop_storage1),
+        (exposure2_temp, F.t < stop_exposure2),
+        (exposure2_temp - temperature_ramp * (F.t - stop_exposure2), F.t < stop_storage2),
+        (storage_temp + temperature_ramp * (F.t - stop_storage2), F.t < stop_tds),
+        (hold_temp, True),
+    ))
 
-three_min = 3 * 60 # s
-incident_flux = 5.4e18  # D m^2 s^-1, beam strength from paper
-ion_flux = sp.Piecewise(
-    (incident_flux, F.t < stop_exposure1 + three_min),
-    (0, F.t < stop_storage1),
-    (incident_flux, F.t < stop_exposure2 + three_min),
-    (0, True)
-)
+    # ### Source Settings ### #
 
-source_term = F.ImplantationFlux(
-    flux=ion_flux, imp_depth=4.5e-9, width=2.5e-9, volume=1  # H/m2/s  # m  # m
-)
+    three_min = 3 * 60 # s
+    incident_flux = 5.4e18  # D m^2 s^-1, beam strength from paper
+    ion_flux = sp.Piecewise(
+        (incident_flux, F.t < stop_exposure1 + three_min),
+        (0, F.t < stop_storage1),
+        (incident_flux, F.t < stop_exposure2 + three_min),
+        (0, True)
+    )
 
-model.sources = [source_term]
+    source_term = F.ImplantationFlux(
+        flux=ion_flux, imp_depth=0.65e-9, width=0.9e-9, volume=1  # H/m2/s  # m  # m
+    )
 
-# TODO: fit f(x)
+    model.sources = [source_term]
 
-# ### Trap Settings ### #
+    # ### Trap Settings ### #
 
-w_atom_density = 6.3e28  # atom/m3
-w_ion_flux = 9.7e13
+    w_atom_density = 6.3e28  # atom/m3
 
-# Undamaged material traps
-trap_1 = F.Trap(
-    k_0=4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
-    E_k=0.39,
-    p_0=1e13,
-    E_p=0.85,
-    density= 0.01 * w_atom_density,
-    materials=tungsten,
-)
+    # Undamaged material traps
+    trap_1 = F.Trap(
+        k_0=4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
+        E_k=0.39,
+        p_0=1e13,
+        E_p=0.85,
+        density= 0.01 * w_atom_density,
+        materials=tungsten,
+    )
 
-trap_2 = F.Trap(
-    k_0=4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
-    E_k=0.39,
-    p_0=1e13,
-    E_p=1.0,
-    density= 0.01 * w_atom_density,
-    materials=tungsten,
-)
+    trap_2 = F.Trap(
+        k_0=4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
+        E_k=0.39,
+        p_0=1e13,
+        E_p=1.0,
+        density= 0.01 * w_atom_density,
+        materials=tungsten,
+    )
 
-# Damage traps
+    # Damage traps
 
-center = 4.5e-9
-width = 2.5e-9
-distribution = (
-    1 / (width * (2 * sp.pi) ** 0.5) * sp.exp(-0.5 * ((F.x - center) / width) ** 2)
-)
+    damage_distribution = sp.Piecewise(
+        (1 - 1/(1 + sp.exp(-12.04*(F.x - 1.2))), F.x > 0),
+        (0 , True)
+    )
 
-trap_3 = F.Trap(
-    k_0 = 4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
-    E_k = 0.39,
-    p_0 = 1e13,
-    E_p = 1.83,
-    density = 0.16 * w_atom_density, # <--------------- experiment variable
-    materials = tungsten,
-)
+    trap_3 = F.Trap(
+        k_0 = 4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
+        E_k = 0.39,
+        p_0 = 1e13,
+        E_p = 1.83,
+        density = damage_distribution * density_1 * w_atom_density,
+        materials = tungsten,
+    )
 
-trap_4 = F.Trap(
-    k_0 = 4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
-    E_k = 0.39,
-    p_0 = 1e13,
-    E_p = 2.10,
-    density = 0.085 * w_atom_density, # <--------------- experiment variable
-    materials =tungsten
-)
+    trap_4 = F.Trap(
+        k_0 = 4.1e-7 / (1.1e-10**2 * 6 * w_atom_density),
+        E_k = 0.39,
+        p_0 = 1e13,
+        E_p = 2.10,
+        density = damage_distribution * density_2 * w_atom_density,
+        materials = tungsten
+    )
 
-model.traps = [trap_1, trap_2, trap_3, trap_4]
+    model.traps = [trap_1, trap_2, trap_3, trap_4]
 
 
-# ### Boundary Conditions ### 
-model.boundary_conditions = [F.DirichletBC(surfaces=[1, 2], value=0, field=0)]
+    # ### Boundary Conditions ### 
+    model.boundary_conditions = [F.DirichletBC(surfaces=[1, 2], value=0, field=0)]
 
-min_temp, max_temp = 500, 1200
+    model.dt = F.Stepsize(
+        initial_value=1,
+        stepsize_change_ratio=1.1,
+        max_stepsize=lambda t: 50 if t > stop_storage2 else None, #TODO: change this, its crude
+        dt_min=1e-05,
+        milestones=[stop_exposure1, stop_storage1, stop_exposure2, stop_storage2, stop_tds]
+    )
 
-model.dt = F.Stepsize(
-    initial_value=0.3,
-    stepsize_change_ratio=1.05,
-    max_stepsize=lambda t: 5 if t > stop_storage2 else None,
-    dt_min=1e-05,
-    milestones=[stop_exposure1, stop_storage1, stop_exposure2, stop_storage2, stop_tds]
-)
+    model.settings = F.Settings(
+        absolute_tolerance=1e10,
+        relative_tolerance=1e-010,
+        final_time = stop_tds #+ 0.5 * 3600 # time to reach max temp
+    )
 
-model.settings = F.Settings(
-    absolute_tolerance=1e10,
-    relative_tolerance=1e-010,
-    final_time = stop_tds + 0.5 * 3600 # time to reach max temp
-)
+    derived_quantities = F.DerivedQuantities(
+        [
+            F.TotalVolume("solute", volume=1),
+            F.TotalVolume("retention", volume=1),
+            F.TotalVolume("1", volume=1),
+            F.TotalVolume("2", volume=1),
+            F.TotalVolume("3", volume=1),
+            F.TotalVolume("4", volume=1),
+            F.HydrogenFlux(surface=1),
+            F.HydrogenFlux(surface=2),
+        ],
+    )
 
-derived_quantities = F.DerivedQuantities(
-    [
-        F.TotalVolume("solute", volume=1),
-        F.TotalVolume("retention", volume=1),
-        F.TotalVolume("1", volume=1),
-        F.TotalVolume("2", volume=1),
-        F.TotalVolume("3", volume=1),
-        F.TotalVolume("4", volume=1),
-        F.HydrogenFlux(surface=1),
-        F.HydrogenFlux(surface=2),
-    ],
-)
+    txt_export = F.TXTExport(
+        field="solute",
+        filename=f"./{exposure1_temp}K.txt",
+        times=[model.settings.final_time],
+    )
 
-model.exports = [derived_quantities]
+    model.exports = [derived_quantities, txt_export]
 
-model.initialise()
-model.run()
+    return derived_quantities, stop_storage2
 ```
 
 ## Comparison with experimental data
@@ -211,42 +204,58 @@ The results produced by FESTIM are in good agreement with the experimental data.
 ```{code-cell} ipython3
 :tags: [hide-input]
 
-t = derived_quantities.t
-flux_left = derived_quantities.filter(fields="solute", surfaces=1).data
-flux_right = derived_quantities.filter(fields="solute", surfaces=2).data
-flux_total = -np.array(flux_left) - np.array(flux_right)
+exposure_temps = [450, 600, 800, 900, 1000] #K
+damage_density_1 = [0.205, 0.160, 0.100, 0.095, 0.100]
+damage_density_2 = [0.110, 0.085, 0.080, 0.065, 0.060]
 
-t = np.array(t)
+colors = [(0.9*(i % 2), 0.2*(i % 4), 0.4*(i % 3)) for i in range(5)]
 
-# plotting simulation data
-plt.plot(t, flux_total, linewidth=3, label="FESTIM")
+pack = zip(range(0, len(exposure_temps)),exposure_temps, damage_density_1, damage_density_2)
+for i, exposure_temp, d1, d2 in pack:
+    derived_quantities, stop_storage2 = setup(exposure_temp, d1, d2)
 
-# plotting trap contributions
-""" trap_data = [derived_quantities.filter(fields=f"{i}").data for i in range(1, 5)]
-contributions = [-np.diff(trap) / np.diff(t) for trap in trap_data]
+    model.initialise()
+    model.run()
 
-colors = [(0.9*(i % 2), 0.2*(i % 4), 0.4*(i % 3)) for i in range(6)]
+    t = derived_quantities.t
+    flux_left = derived_quantities.filter(fields="solute", surfaces=1).data
+    flux_right = derived_quantities.filter(fields="solute", surfaces=2).data
+    flux_total = -np.array(flux_left) - np.array(flux_right)
 
-for i, cont in enumerate(contributions):
-    label = f"Trap {i + 1}"
-    plt.plot(temp[1:], cont, linestyle="--", color=colors[i], label=label)
+    t = np.array(t)
 
-    plt.fill_between(temp[1:], 0, cont, facecolor="grey", alpha=0.1) """
+    rem = sum((time <= stop_storage2) for time in t)
 
+    t = t[rem:]
+    temp = [storage_temp + (time - stop_storage2)*temperature_ramp for time in t]
+    flux_total = flux_total[rem:]
 
-# plotting original data
-""" experimental_tds = np.genfromtxt("ogorodnikova-original.csv", delimiter=",")
-experimental_temp = experimental_tds[:, 0]
-experimental_flux = experimental_tds[:, 1]
-plt.scatter(experimental_temp, experimental_flux, color="green", label="original", s=16) """
+    # plotting simulation data
+    plt.plot(temp, flux_total, linewidth=3, label=f"{exposure_temp} K", color = colors[i])
+
+    # plotting original data
+    """ experimental_tds = np.genfromtxt(f"original_{exposure_temp}.csv", delimiter=",")
+    experimental_temp = experimental_tds[:, 0]
+    experimental_flux = experimental_tds[:, 1]
+    plt.scatter(experimental_temp, experimental_flux, color="green", label=f"{exposure_temp}K", s=16) """
 
 plt.legend()
-""" plt.xlim(min_temp, max_temp)
-plt.ylim() """
+plt.xlim(500, 1200)
+plt.ylim(bottom=0)
 plt.ylabel(r"Desorption flux (m$^{-2}$ s$^{-1}$)")
 plt.xlabel(r"Temperature (K)")
 
 plt.show()
+```
+
+```{code-cell} ipython3
+
+for i, exposure_temp in enumerate(exposure_temps):
+    # plotting depth distribution
+    data = np.genfromtxt(f"./{exposure_temp}K.txt", skip_header=1, delimiter=",")
+    data = data[data[:, 0].argsort()]  # make sure data is sorted
+
+    plt.plot(data[:, 0], data[:, 1], label=f"{exposure_temp}K", color=colors[i])
 ```
 
 ```{note}
