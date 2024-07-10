@@ -219,7 +219,6 @@ def plot_tds(derived_quantities, trap_contributions=False, **kwargs):
 
 from matplotlib import cm, colors
 
-dpa_values = list(dpa_n_i.keys())
 norm = colors.LogNorm(vmin=min(dpa_values[1:]), vmax=max(dpa_values))
 colorbar = cm.viridis
 sm = plt.cm.ScalarMappable(cmap=colorbar, norm=norm)
