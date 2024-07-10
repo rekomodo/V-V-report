@@ -128,7 +128,7 @@ def festim_sim(densities):
     k_0 = D_0 / (1.1e-10**2 * 6 * w_atom_density)
 
     trap_1 = F.Trap(
-        E_k=damage_tungsten.E_D,
+        E_k=damaged_tungsten.E_D,
         k_0=k_0,
         E_p=1.04,
         p_0=1e13,
@@ -142,7 +142,7 @@ def festim_sim(densities):
             neutron_induced_traps.append(
                 F.Trap(
                     k_0=k_0,
-                    E_k=damage_tungsten.E_D,
+                    E_k=damaged_tungsten.E_D,
                     p_0=1e13,
                     E_p=E_p,
                     density=density * damage_dist,
@@ -166,13 +166,12 @@ def festim_sim(densities):
         [
             F.TotalVolume("solute", volume=1),
             F.TotalVolume("retention", volume=1),
-            F.TotalVolume("1", volume=1),
             F.HydrogenFlux(surface=1),
             F.HydrogenFlux(surface=2),
         ],
     )
     derived_quantities += [
-        F.TotalVolume(f"{i}", volume=1) for i, _ in enumerate(densities, start=2)
+        F.TotalVolume(f"{i}", volume=1) for i, _ in enumerate(model.traps, start=1)
     ]
     model.exports = [derived_quantities]
     model.initialise()
@@ -191,20 +190,6 @@ The results produced by FESTIM are in good agreement with the experimental data.
 
 ```{code-cell} ipython3
 :tags: [hide-input]
-
-def plot_experimental_tds(filename, **kwargs):
-    experimental_tds = np.genfromtxt(filename, delimiter=",")
-    experimental_temp = experimental_tds[:, 0]
-    experimental_flux = experimental_tds[:, 1] / sample_area
-    return plt.plot(experimental_temp, experimental_flux, **kwargs)
-
-
-def scatter_experimental_tds(filename, **kwargs):
-    experimental_tds = np.genfromtxt(filename, delimiter=",")
-    experimental_temp = experimental_tds[:, 0]
-    experimental_flux = experimental_tds[:, 1] / sample_area
-    return plt.scatter(experimental_temp, experimental_flux, **kwargs)
-
 
 def plot_tds(derived_quantities, trap_contributions=False, **kwargs):
     t = np.array(derived_quantities.t)
@@ -240,6 +225,11 @@ colorbar = cm.viridis
 sm = plt.cm.ScalarMappable(cmap=colorbar, norm=norm)
 
 for dpa, derived_quantities in dpa_to_quantities.items():
+    filename = f"tds_data/{dpa}_dpa.csv"
+    experimental_tds = np.genfromtxt(filename, delimiter=",")
+    experimental_temp = experimental_tds[:, 0]
+    experimental_flux = experimental_tds[:, 1] / sample_area
+
     if dpa == 0.1:
         plt.figure(1)
         plt.title("Damage = 0.1 dpa")
@@ -248,14 +238,13 @@ for dpa, derived_quantities in dpa_to_quantities.items():
         plot_tds(
             derived_quantities, linewidth=3, label="FESTIM", trap_contributions=True
         )
-        scatter_experimental_tds(
-            f"tds_data/{dpa}_dpa.csv", color="black", label="experiment", s=16
+        plt.scatter(
+            experimental_temp, experimental_flux, color="black", label="experiment", s=16
         )
 
-    colour = colorbar(norm(dpa))
     plt.figure(2)
     plot_tds(derived_quantities, linestyle="dashed", color="tab:grey", linewidth=2)
-    plot_experimental_tds(f"tds_data/{dpa}_dpa.csv", color=colour, linewidth=3)
+    plt.plot(experimental_temp, experimental_flux, color=colorbar(norm(dpa)), linewidth=3)
 
 plt.figure(1)
 plt.ylim(bottom=0, top=1e17)
