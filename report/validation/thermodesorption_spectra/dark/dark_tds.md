@@ -36,7 +36,7 @@ $$
     f(x) = \frac{1}{1 + \exp{ \frac{\left( x - x_0 \right)}{\Delta x} }}
 $$
 
-Tables with the relevant trap parameters are at the bottom of the page.
+The density distribution of the neutron-induced traps is $n_i \ f(x)$.
 
 +++
 
@@ -128,7 +128,7 @@ def festim_sim(densities):
     k_0 = D_0 / (1.1e-10**2 * 6 * w_atom_density)
 
     trap_1 = F.Trap(
-        E_k=0.28,
+        E_k=damage_tungsten.E_D,
         k_0=k_0,
         E_p=1.04,
         p_0=1e13,
@@ -142,7 +142,7 @@ def festim_sim(densities):
             neutron_induced_traps.append(
                 F.Trap(
                     k_0=k_0,
-                    E_k=E_D,
+                    E_k=damage_tungsten.E_D,
                     p_0=1e13,
                     E_p=E_p,
                     density=density * damage_dist,
@@ -170,7 +170,6 @@ def festim_sim(densities):
             F.HydrogenFlux(surface=1),
             F.HydrogenFlux(surface=2),
         ],
-        filename="Results/ours.csv",
     )
     derived_quantities += [
         F.TotalVolume(f"{i}", volume=1) for i, _ in enumerate(densities, start=2)
@@ -180,6 +179,10 @@ def festim_sim(densities):
     model.run()
 
     return derived_quantities
+
+dpa_to_quantities = {}
+for dpa, densities in dpa_n_i.items():
+    dpa_to_quantities[dpa] = festim_sim(densities)
 ```
 
 ## Comparison with experimental data
@@ -236,9 +239,7 @@ norm = colors.LogNorm(vmin=min(dpa_values[1:]), vmax=max(dpa_values))
 colorbar = cm.viridis
 sm = plt.cm.ScalarMappable(cmap=colorbar, norm=norm)
 
-for dpa, densities in dpa_n_i.items():
-    derived_quantities = festim_sim(densities)
-
+for dpa, derived_quantities in dpa_to_quantities.items():
     if dpa == 0.1:
         plt.figure(1)
         plt.title("Damage = 0.1 dpa")
@@ -289,25 +290,3 @@ The experimental data was taken from {cite}`dark_modelling_2024_code`.
 
 +++
 
-The density distribution of the neutron-induced traps is $n_i \ f(x)$.
-
-### Trap parameters
-
-|Trap|$k_0 \ (m^3 s^{-1})$|$E_k \ (\mathrm{eV})$|$E_p \ (\mathrm{eV})$|$p_0 \ (s^{-1})$|
-|:---|:--|:--|:--|:--|:------|
-|1|{glue:text}`trap0k_0:.2e`|{glue:text}`trap0E_k:.2e`|{glue:text}`trap0E_p:.2e`|{glue:text}`trap0p_0:.2e`|
-|D1|{glue:text}`trap1k_0:.2e`|{glue:text}`trap1E_k:.2e`|{glue:text}`trap1E_p:.2e`|{glue:text}`trap1p_0:.2e`|
-|D2|{glue:text}`trap2k_0:.2e`|{glue:text}`trap2E_k:.2e`|{glue:text}`trap2E_p:.2e`|{glue:text}`trap2p_0:.2e`|
-|D3|{glue:text}`trap3k_0:.2e`|{glue:text}`trap3E_k:.2e`|{glue:text}`trap3E_p:.2e`|{glue:text}`trap3p_0:.2e`|
-|D4|{glue:text}`trap4k_0:.2e`|{glue:text}`trap4E_k:.2e`|{glue:text}`trap4E_p:.2e`|{glue:text}`trap4p_0:.2e`|
-|D5|{glue:text}`trap5k_0:.2e`|{glue:text}`trap5E_k:.2e`|{glue:text}`trap5E_p:.2e`|{glue:text}`trap5p_0:.2e`|
-
-### Density per induced trap for each dpa dose
-
-|Trap|$0.001$|$0.005$|$0.023$|$0.1$|$0.23$|$0.5$|$2.5$|
-|:---|:------|:------|:------|:----|:-----|:----|:----|
-|D1|{glue:text}`ni_0_0:.2e`|{glue:text}`ni_0_1:.2e`|{glue:text}`ni_0_2:.2e`|{glue:text}`ni_0_3:.2e`|{glue:text}`ni_0_4:.2e`|{glue:text}`ni_0_5:.2e`|{glue:text}`ni_0_6:.2e`|
-|D2|{glue:text}`ni_1_0:.2e`|{glue:text}`ni_1_1:.2e`|{glue:text}`ni_1_2:.2e`|{glue:text}`ni_1_3:.2e`|{glue:text}`ni_1_4:.2e`|{glue:text}`ni_1_5:.2e`|{glue:text}`ni_1_6:.2e`|
-|D3|{glue:text}`ni_2_0:.2e`|{glue:text}`ni_2_1:.2e`|{glue:text}`ni_2_2:.2e`|{glue:text}`ni_2_3:.2e`|{glue:text}`ni_2_4:.2e`|{glue:text}`ni_2_5:.2e`|{glue:text}`ni_2_6:.2e`|
-|D4|{glue:text}`ni_3_0:.2e`|{glue:text}`ni_3_1:.2e`|{glue:text}`ni_3_2:.2e`|{glue:text}`ni_3_3:.2e`|{glue:text}`ni_3_4:.2e`|{glue:text}`ni_3_5:.2e`|{glue:text}`ni_3_6:.2e`|
-|D5|{glue:text}`ni_4_0:.2e`|{glue:text}`ni_4_1:.2e`|{glue:text}`ni_4_2:.2e`|{glue:text}`ni_4_3:.2e`|{glue:text}`ni_4_4:.2e`|{glue:text}`ni_4_5:.2e`|{glue:text}`ni_4_6:.2e`|
