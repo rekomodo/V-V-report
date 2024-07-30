@@ -12,7 +12,7 @@ kernelspec:
   name: python3
 ---
 
-# Verification
+# Surface Kinetics MMS
 
 Author: Vladimir Kulagin
 
